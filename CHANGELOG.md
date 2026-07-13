@@ -8,6 +8,12 @@ images render exactly as before, with identical flags and output.
 The fork lives at **<https://github.com/deeplook/agg>** and is based on upstream
 agg **1.9.0**.
 
+![agg inline images demo](examples/inline-images.gif)
+
+*One asciicast, rendered to the GIF above with this fork: inline **PNG**, **JPEG**,
+**SVG**, **PDF** and **animated GIF** images, followed by terminal scrolling. Source
+cast: [`examples/inline-images.cast`](examples/inline-images.cast).*
+
 This file documents what this fork adds relative to upstream. The format is based
 on [Keep a Changelog](https://keepachangelog.com/).
 
