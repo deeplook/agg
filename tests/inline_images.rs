@@ -16,6 +16,10 @@ fn render(cast: &[u8], renderer: agg::Renderer, inline_images: bool) -> Vec<u8> 
     let config = agg::Config {
         renderer,
         inline_images,
+        // Use the repo's bundled font so the test doesn't depend on system
+        // fonts being installed (e.g. in a CI sandbox).
+        font_dirs: vec!["fonts".to_string()],
+        font_family: Some("JetBrains Mono".to_string()),
         // Keep the test quiet and deterministic.
         show_progress_bar: false,
         ..Default::default()
