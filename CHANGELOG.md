@@ -130,6 +130,17 @@ is distinguishable from an upstream install.
   recording-to-GIF renderer doesn't need them.
 - Behavior is unchanged for recordings that contain no inline images.
 
+### Considered but deliberately not included
+
+- **PNG / animated PNG (APNG) output.** Output remains GIF only, to honor what
+  agg _is_ — the **a**sciinema **g**if **g**enerator. Truecolor APNG would render
+  embedded images more faithfully than GIF's 256-color palette, and it would be
+  straightforward to add (the `png` crate — already a transitive dependency —
+  supports APNG encoding via `set_animated`/`set_frame_delay`; only the final
+  encode step in `run` would branch on the output file extension). It was left
+  out on purpose so the tool keeps a single, honest purpose; revisit only if a
+  concrete need for truecolor stills/animation appears.
+
 ### Unchanged from upstream
 
 Everything else — CLI flags, themes, fonts, frame selection, GIF encoding — is
