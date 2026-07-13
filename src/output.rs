@@ -235,7 +235,10 @@ mod tests {
     }
 
     fn anim_frames(frames: &[Frame]) -> Vec<usize> {
-        frames.iter().map(|f| f.snapshot.images[0].anim_frame).collect()
+        frames
+            .iter()
+            .map(|f| f.snapshot.images[0].anim_frame)
+            .collect()
     }
 
     #[test]

@@ -58,10 +58,16 @@ pub struct Grid {
 }
 
 /// Composite every placement onto `buf` (row-major RGBA8, `pixel_width` wide).
-pub fn composite(buf: &mut [RGBA8], grid: &Grid, placements: &[Placement], cache: &mut DecodeCache) {
+pub fn composite(
+    buf: &mut [RGBA8],
+    grid: &Grid,
+    placements: &[Placement],
+    cache: &mut DecodeCache,
+) {
     for placement in placements {
         if let Some(frames) = cache.get(&placement.image) {
-            if let Some(frame) = frames.get(placement.anim_frame.min(frames.len().saturating_sub(1)))
+            if let Some(frame) =
+                frames.get(placement.anim_frame.min(frames.len().saturating_sub(1)))
             {
                 draw(buf, grid, placement, frame);
             }
@@ -375,8 +381,14 @@ fn pdf_to_png(data: &[u8]) -> Option<Vec<u8>> {
                 &in_str,
             ],
         ),
-        ("mutool", vec!["draw", "-r", "150", "-o", &out_str, &in_str, "1"]),
-        ("sips", vec!["-s", "format", "png", &in_str, "--out", &out_str]),
+        (
+            "mutool",
+            vec!["draw", "-r", "150", "-o", &out_str, &in_str, "1"],
+        ),
+        (
+            "sips",
+            vec!["-s", "format", "png", &in_str, "--out", &out_str],
+        ),
     ];
 
     let png = attempts.iter().find_map(|(program, args)| {

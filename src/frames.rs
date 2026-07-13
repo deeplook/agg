@@ -272,12 +272,14 @@ mod tests {
             char_h: 18.0,
         };
         let events = [output(0.0, &image_seq("height=2"))];
-        let frames = super::from_range(&events, (10, 5), Some(cfg), None, None)
-            .collect::<Vec<_>>();
+        let frames = super::from_range(&events, (10, 5), Some(cfg), None, None).collect::<Vec<_>>();
 
         let images = &frames.last().unwrap().snapshot.images;
         assert_eq!(images.len(), 1);
-        assert_eq!((images[0].col, images[0].row, images[0].display_rows), (0, 0, 2));
+        assert_eq!(
+            (images[0].col, images[0].row, images[0].display_rows),
+            (0, 0, 2)
+        );
     }
 
     #[test]
@@ -289,8 +291,7 @@ mod tests {
         // 3-row terminal: a height-2 image at the top, then a newline once the
         // cursor is at the bottom scrolls the image partly off the top.
         let events = [output(0.0, &image_seq("height=2")), output(1.0, "\n")];
-        let frames = super::from_range(&events, (4, 3), Some(cfg), None, None)
-            .collect::<Vec<_>>();
+        let frames = super::from_range(&events, (4, 3), Some(cfg), None, None).collect::<Vec<_>>();
 
         let at = |t: f64| {
             frames
@@ -315,12 +316,14 @@ mod tests {
         // Kitty transmit-and-display, sized to 6x3 cells.
         let seq = format!("\x1b_Ga=T,f=100,c=6,r=3;{PNG_B64}\x1b\\");
         let events = [output(0.0, &seq)];
-        let frames = super::from_range(&events, (20, 8), Some(cfg), None, None)
-            .collect::<Vec<_>>();
+        let frames = super::from_range(&events, (20, 8), Some(cfg), None, None).collect::<Vec<_>>();
 
         let images = &frames.last().unwrap().snapshot.images;
         assert_eq!(images.len(), 1);
-        assert_eq!((images[0].col, images[0].row, images[0].display_rows), (0, 0, 3));
+        assert_eq!(
+            (images[0].col, images[0].row, images[0].display_rows),
+            (0, 0, 3)
+        );
     }
 
     #[test]

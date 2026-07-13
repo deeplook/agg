@@ -245,7 +245,11 @@ fn assemble(control: &Control, payload: &str) -> Option<Assembled> {
         .and_then(|(s, v)| Some((s.parse().ok()?, v.parse().ok()?)));
 
     match format {
-        Some(100) => Some((bytes.clone(), Mime::Png, format::natural_dimensions(&bytes, Mime::Png))),
+        Some(100) => Some((
+            bytes.clone(),
+            Mime::Png,
+            format::natural_dimensions(&bytes, Mime::Png),
+        )),
         Some(24) => declared.map(|d| (bytes, Mime::Rgb, Some(d))),
         Some(32) => declared.map(|d| (bytes, Mime::Rgba, Some(d))),
         None => {

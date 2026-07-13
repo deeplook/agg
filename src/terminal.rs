@@ -115,8 +115,12 @@ impl TerminalState {
                     let cursor = self.vt.cursor();
                     let (col, row) = (cursor.col, cursor.row);
 
-                    let display_rows =
-                        image_rows(&image, self.cols, images.config.char_w, images.config.char_h);
+                    let display_rows = image_rows(
+                        &image,
+                        self.cols,
+                        images.config.char_w,
+                        images.config.char_h,
+                    );
 
                     // Reserve vertical space by advancing the cursor, which may
                     // scroll the viewport; existing images scroll with it.

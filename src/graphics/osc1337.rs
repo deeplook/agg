@@ -224,7 +224,10 @@ fn parse_dimension(value: Option<&String>) -> Dim {
     trimmed.parse().map(Dim::Cells).unwrap_or(Dim::Auto)
 }
 
-fn create_image(params: &std::collections::HashMap<String, String>, base64_data: &str) -> Option<Image> {
+fn create_image(
+    params: &std::collections::HashMap<String, String>,
+    base64_data: &str,
+) -> Option<Image> {
     build_image(
         parse_dimension(params.get("width")),
         parse_dimension(params.get("height")),

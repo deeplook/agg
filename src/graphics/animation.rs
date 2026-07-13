@@ -81,12 +81,10 @@ mod tests {
             let mut encoder = GifEncoder::new(Cursor::new(&mut out));
             encoder.set_repeat(Repeat::Infinite).unwrap();
             for color in colors {
-                let buf = RgbaImage::from_pixel(
-                    4,
-                    4,
-                    image::Rgba([color[0], color[1], color[2], 255]),
-                );
-                let frame = Frame::from_parts(buf, 0, 0, Delay::from_numer_denom_ms(delay_ms as u32, 1));
+                let buf =
+                    RgbaImage::from_pixel(4, 4, image::Rgba([color[0], color[1], color[2], 255]));
+                let frame =
+                    Frame::from_parts(buf, 0, 0, Delay::from_numer_denom_ms(delay_ms as u32, 1));
                 encoder.encode_frame(frame).unwrap();
             }
         }
