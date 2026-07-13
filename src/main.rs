@@ -189,6 +189,10 @@ struct Cli {
     #[clap(long)]
     no_loop: bool,
 
+    /// Do not render inline images (iTerm2 OSC 1337) embedded in the recording
+    #[clap(long)]
+    no_inline_images: bool,
+
     /// Limit idle time to max number of seconds [default: 5]
     #[clap(long)]
     idle_time_limit: Option<f64>,
@@ -291,6 +295,7 @@ fn main() -> Result<()> {
     let config = agg::Config {
         bold_is_bright: cli.bold_is_bright,
         cols: cli.cols,
+        inline_images: !cli.no_inline_images,
         emoji_font_family: cli.emoji_font_family,
         font_dirs: cli.font_dir,
         font_family: cli.font_family,

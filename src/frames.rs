@@ -7,7 +7,7 @@
 use std::collections::VecDeque;
 
 use crate::asciicast::Event;
-use crate::terminal::{self, Snapshot};
+use crate::terminal::{ImageConfig, Snapshot, TerminalState};
 
 /// A terminal state at a point in time. Holds terminal cells, not rendered
 /// pixels.
@@ -18,10 +18,10 @@ pub struct Frame {
 }
 
 impl Frame {
-    fn from_vt(time: f64, vt: &avt::Vt) -> Frame {
+    fn from_state(time: f64, state: &TerminalState) -> Frame {
         Frame {
             time,
-            snapshot: Snapshot::from_vt(vt),
+            snapshot: state.snapshot(),
         }
     }
 
@@ -43,13 +43,14 @@ trait FrameEmitter {
 pub fn from_range<'a>(
     events: &'a [Event],
     terminal_size: (usize, usize),
+    image_config: Option<ImageConfig>,
     start: Option<f64>,
     end: Option<f64>,
 ) -> impl Iterator<Item = Frame> + 'a {
-    let vt = terminal::build(terminal_size);
-    let blank = Frame::from_vt(0.0, &vt);
+    let state = TerminalState::new(terminal_size, image_config);
+    let blank = Frame::from_state(0.0, &state);
 
-    generate_with(vt, events, RangeEmitter::new(start, end, blank))
+    generate_with(state, events, RangeEmitter::new(start, end, blank))
 }
 
 /// Generate terminal states at each resolved timestamp, using player seek
@@ -57,19 +58,20 @@ pub fn from_range<'a>(
 pub fn at_positions<'a>(
     events: &'a [Event],
     terminal_size: (usize, usize),
+    image_config: Option<ImageConfig>,
     positions: Vec<f64>,
 ) -> impl Iterator<Item = Frame> + 'a {
-    let vt = terminal::build(terminal_size);
-    let blank = Frame::from_vt(0.0, &vt);
+    let state = TerminalState::new(terminal_size, image_config);
+    let blank = Frame::from_state(0.0, &state);
 
-    generate_with(vt, events, PositionEmitter::new(positions, blank))
+    generate_with(state, events, PositionEmitter::new(positions, blank))
 }
 
 /// Replay the timeline through `vt`, feeding the emitter one candidate frame
 /// per event. Only output events mutate the terminal; marker and `Other` events
 /// still produce a candidate frame so the emitter can detect crossings.
 fn generate_with<'a, E: FrameEmitter + 'a>(
-    mut vt: avt::Vt,
+    mut state: TerminalState,
     events: &'a [Event],
     mut emitter: E,
 ) -> impl Iterator<Item = Frame> + 'a {
@@ -94,10 +96,10 @@ fn generate_with<'a, E: FrameEmitter + 'a>(
 
             Some(event) => {
                 if let Event::Output { data, .. } = event {
-                    terminal::feed_str(&mut vt, data);
+                    state.feed_str(data);
                 }
 
-                let frame = Frame::from_vt(event.time(), &vt);
+                let frame = Frame::from_state(event.time(), &state);
                 pending.extend(emitter.emit(frame, event));
             }
         }
@@ -248,11 +250,69 @@ mod tests {
         start: Option<f64>,
         end: Option<f64>,
     ) -> Vec<Frame> {
-        super::from_range(events, size, start, end).collect()
+        super::from_range(events, size, None, start, end).collect()
     }
 
     fn at_positions(events: &[Event], size: (usize, usize), positions: Vec<f64>) -> Vec<Frame> {
-        super::at_positions(events, size, positions).collect()
+        super::at_positions(events, size, None, positions).collect()
+    }
+
+    // 1x1 PNG, base64-encoded, for inline-image tests.
+    const PNG_B64: &str =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+    fn image_seq(params: &str) -> String {
+        format!("\x1b]1337;File=inline=1;{params}:{PNG_B64}\x07")
+    }
+
+    #[test]
+    fn inline_image_is_placed_at_the_cursor() {
+        let cfg = ImageConfig {
+            char_w: 9.0,
+            char_h: 18.0,
+        };
+        let events = [output(0.0, &image_seq("height=2"))];
+        let frames = super::from_range(&events, (10, 5), Some(cfg), None, None)
+            .collect::<Vec<_>>();
+
+        let images = &frames.last().unwrap().snapshot.images;
+        assert_eq!(images.len(), 1);
+        assert_eq!((images[0].col, images[0].row, images[0].display_rows), (0, 0, 2));
+    }
+
+    #[test]
+    fn inline_image_scrolls_up_with_content() {
+        let cfg = ImageConfig {
+            char_w: 9.0,
+            char_h: 18.0,
+        };
+        // 3-row terminal: a height-2 image at the top, then a newline once the
+        // cursor is at the bottom scrolls the image partly off the top.
+        let events = [output(0.0, &image_seq("height=2")), output(1.0, "\n")];
+        let frames = super::from_range(&events, (4, 3), Some(cfg), None, None)
+            .collect::<Vec<_>>();
+
+        let at = |t: f64| {
+            frames
+                .iter()
+                .filter(|f| f.time <= t)
+                .next_back()
+                .unwrap()
+                .snapshot
+                .images
+                .clone()
+        };
+
+        assert_eq!(at(0.0)[0].row, 0);
+        assert_eq!(at(1.0)[0].row, -1);
+    }
+
+    #[test]
+    fn inline_images_are_absent_without_image_config() {
+        let events = [output(0.0, &image_seq("height=2"))];
+        let frames = from_range(&events, (10, 5), None, None);
+
+        assert!(frames.iter().all(|f| f.snapshot.images.is_empty()));
     }
 
     #[test]

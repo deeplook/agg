@@ -1,6 +1,7 @@
 mod asciicast;
 mod fonts;
 mod frames;
+mod graphics;
 mod output;
 mod renderer;
 mod selection;
@@ -35,10 +36,13 @@ pub const DEFAULT_LINE_HEIGHT: f64 = 1.4;
 pub const DEFAULT_NO_LOOP: bool = false;
 pub const DEFAULT_SPEED: f64 = 1.0;
 pub const DEFAULT_IDLE_TIME_LIMIT: f64 = 5.0;
+pub const DEFAULT_INLINE_IMAGES: bool = true;
 
 pub struct Config {
     pub bold_is_bright: bool,
     pub cols: Option<usize>,
+    /// Render inline images embedded in the recording (iTerm2 OSC 1337).
+    pub inline_images: bool,
     pub emoji_font_family: String,
     pub font_size: usize,
     pub font_dirs: Vec<String>,
@@ -64,6 +68,7 @@ impl Default for Config {
         Self {
             bold_is_bright: DEFAULT_BOLD_IS_BRIGHT,
             cols: None,
+            inline_images: DEFAULT_INLINE_IMAGES,
             emoji_font_family: String::from(DEFAULT_EMOJI_FONT_FAMILY),
             font_dirs: vec![],
             font_family: None,
@@ -181,26 +186,6 @@ pub fn run<I: BufRead, O: Write + Send>(input: I, output: O, config: Config) -> 
     let summary = timeline::Summary::from_events(&events);
     let plan = selection::resolve(&config.selection, &summary)?;
 
-    let frames: Vec<frames::Frame> = match plan {
-        // Range selections produce time-based animation frames: dedupe duplicate
-        // states, normalize the first frame to t=0, then cap FPS.
-        selection::SelectionPlan::Range { start, end } => {
-            let frames = frames::from_range(&events, terminal_size, start, end);
-            let frames = output::dedupe_visual_changes(frames);
-            let frames = output::adjust_timeline_timestamps(frames);
-            output::cap_fps(frames, config.fps_cap).collect()
-        }
-
-        // Discrete selections: keep every resolved position, with no visual
-        // dedupe or FPS capping, spaced by a fixed per-frame duration.
-        selection::SelectionPlan::Positions(positions) => {
-            let frames = frames::at_positions(&events, terminal_size, positions);
-            output::adjust_discrete_timestamps(frames, config.last_frame_duration).collect()
-        }
-    };
-
-    let count = frames.len() as u64;
-
     info!(
         "recording terminal size: {}x{}",
         terminal_size.0, terminal_size.1
@@ -239,6 +224,42 @@ pub fn run<I: BufRead, O: Write + Send>(input: I, output: O, config: Config) -> 
             fonts.text_family
         );
     }
+
+    // Inline images are placed against the grid using cell pixel metrics, so
+    // fonts must be resolved before frame generation. Skip all image work when
+    // the feature is disabled.
+    let image_config = if config.inline_images {
+        let (char_w, char_h) = renderer::cell_metrics(
+            &fonts.db,
+            &fonts.text_family,
+            config.font_size,
+            config.line_height,
+        );
+
+        Some(terminal::ImageConfig { char_w, char_h })
+    } else {
+        None
+    };
+
+    let frames: Vec<frames::Frame> = match plan {
+        // Range selections produce time-based animation frames: dedupe duplicate
+        // states, normalize the first frame to t=0, then cap FPS.
+        selection::SelectionPlan::Range { start, end } => {
+            let frames = frames::from_range(&events, terminal_size, image_config, start, end);
+            let frames = output::dedupe_visual_changes(frames);
+            let frames = output::adjust_timeline_timestamps(frames);
+            output::cap_fps(frames, config.fps_cap).collect()
+        }
+
+        // Discrete selections: keep every resolved position, with no visual
+        // dedupe or FPS capping, spaced by a fixed per-frame duration.
+        selection::SelectionPlan::Positions(positions) => {
+            let frames = frames::at_positions(&events, terminal_size, image_config, positions);
+            output::adjust_discrete_timestamps(frames, config.last_frame_duration).collect()
+        }
+    };
+
+    let count = frames.len() as u64;
 
     let theme_opt = config
         .theme

@@ -9,6 +9,7 @@ use swash::scale::image::{Content, Image};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::FontRef;
 
+use super::image_layer::{self, DecodeCache, Grid};
 use crate::renderer::{color_to_rgb, text_attrs, Renderer, Settings, TextAttrs};
 use crate::terminal::Snapshot;
 use crate::theme::Theme;
@@ -60,6 +61,7 @@ struct BoxLineGlyph {
 pub struct SwashRenderer {
     font_families: Vec<String>,
     theme: Theme,
+    terminal_cols: usize,
     pixel_width: usize,
     pixel_height: usize,
     font_aa_levels: u16,
@@ -72,6 +74,7 @@ pub struct SwashRenderer {
     scale_context: ScaleContext,
     glyph_cache: HashMap<CharVariant, Option<Image>>,
     font_id_cache: HashMap<FontFace, Option<fontdb::ID>>,
+    image_cache: DecodeCache,
     bold_is_bright: bool,
     hinting: bool,
 }
@@ -117,7 +120,7 @@ fn font_id_key(font_id: fontdb::ID) -> [u64; 2] {
     [hasher.finish(), 0]
 }
 
-fn col_width(db: &fontdb::Database, family: &str, font_size: usize) -> Option<f64> {
+pub(super) fn col_width(db: &fontdb::Database, family: &str, font_size: usize) -> Option<f64> {
     let font_id = get_font_id(db, &[family], fontdb::Weight::NORMAL, fontdb::Style::Normal)?;
 
     db.with_face_data(font_id, |font_data, face_index| {
@@ -176,6 +179,7 @@ impl SwashRenderer {
             font_db: settings.font_db,
             font_families: settings.font_families,
             theme: settings.theme,
+            terminal_cols: cols,
             pixel_width: ((cols + 2) as f64 * col_width).round() as usize,
             pixel_height: ((rows + 1) as f64 * row_height).round() as usize,
             font_aa_levels: settings.font_aa_levels,
@@ -187,6 +191,7 @@ impl SwashRenderer {
             scale_context: ScaleContext::new(),
             font_id_cache: HashMap::new(),
             glyph_cache: HashMap::new(),
+            image_cache: DecodeCache::new(),
             bold_is_bright: settings.bold_is_bright,
             hinting: settings.hinting,
         }
@@ -1291,6 +1296,20 @@ impl Renderer for SwashRenderer {
             {
                 self.paint_glyph(&mut buf, cell.ch, cell.layout, &cell.attrs, cell.fg);
             }
+        }
+
+        if !snapshot.images.is_empty() {
+            let grid = Grid {
+                char_w: self.col_width,
+                char_h: self.row_height,
+                margin_l,
+                margin_t: margin_t as f64,
+                cols: self.terminal_cols,
+                pixel_width: self.pixel_width,
+                pixel_height: self.pixel_height,
+            };
+
+            image_layer::composite(&mut buf, &grid, &snapshot.images, &mut self.image_cache);
         }
 
         ImgVec::new(buf, self.pixel_width, self.pixel_height)
