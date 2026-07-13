@@ -295,8 +295,7 @@ mod tests {
         let at = |t: f64| {
             frames
                 .iter()
-                .filter(|f| f.time <= t)
-                .next_back()
+                .rfind(|f| f.time <= t)
                 .unwrap()
                 .snapshot
                 .images
@@ -305,6 +304,23 @@ mod tests {
 
         assert_eq!(at(0.0)[0].row, 0);
         assert_eq!(at(1.0)[0].row, -1);
+    }
+
+    #[test]
+    fn kitty_image_is_placed_at_the_cursor() {
+        let cfg = ImageConfig {
+            char_w: 9.0,
+            char_h: 18.0,
+        };
+        // Kitty transmit-and-display, sized to 6x3 cells.
+        let seq = format!("\x1b_Ga=T,f=100,c=6,r=3;{PNG_B64}\x1b\\");
+        let events = [output(0.0, &seq)];
+        let frames = super::from_range(&events, (20, 8), Some(cfg), None, None)
+            .collect::<Vec<_>>();
+
+        let images = &frames.last().unwrap().snapshot.images;
+        assert_eq!(images.len(), 1);
+        assert_eq!((images[0].col, images[0].row, images[0].display_rows), (0, 0, 3));
     }
 
     #[test]

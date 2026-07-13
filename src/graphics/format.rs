@@ -49,7 +49,9 @@ pub fn natural_dimensions(data: &[u8], mime: Mime) -> Option<(u32, u32)> {
                 .ok()
         }
         Mime::Svg => svg_dimensions(data),
-        Mime::Pdf | Mime::Unknown => None,
+        // Raw kitty formats carry dimensions in the protocol, not the data;
+        // PDF and unknown expose none here.
+        Mime::Rgb | Mime::Rgba | Mime::Pdf | Mime::Unknown => None,
     }
 }
 

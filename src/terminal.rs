@@ -1,6 +1,6 @@
 use avt::Vt;
 
-use crate::graphics::{image_rows, ImageStore, Osc1337Parser, Placement, Segment};
+use crate::graphics::{image_rows, ImageStore, KittyParser, Osc1337Parser, Placement, Segment};
 
 pub fn build(terminal_size: (usize, usize)) -> Vt {
     Vt::builder()
@@ -27,9 +27,34 @@ pub struct TerminalState {
 }
 
 struct ImageState {
-    parser: Osc1337Parser,
+    osc1337: Osc1337Parser,
+    kitty: KittyParser,
     store: ImageStore,
     config: ImageConfig,
+}
+
+impl ImageState {
+    /// Parse output through both protocol parsers. The OSC parser runs first
+    /// and passes kitty's APC sequences through as text (it only intercepts
+    /// `ESC ]`), which the kitty parser then splits.
+    fn parse(&mut self, data: &str) -> Vec<Segment> {
+        let mut segments = Vec::new();
+
+        for segment in self.osc1337.parse(data) {
+            match segment {
+                Segment::Text(text) => segments.extend(self.kitty.parse(&text)),
+                other => segments.push(other),
+            }
+        }
+
+        segments
+    }
+
+    fn reset(&mut self) {
+        self.store.clear();
+        self.osc1337.reset();
+        self.kitty.reset();
+    }
 }
 
 impl TerminalState {
@@ -38,7 +63,8 @@ impl TerminalState {
             vt: build(terminal_size),
             cols: terminal_size.0,
             images: image_config.map(|config| ImageState {
-                parser: Osc1337Parser::new(),
+                osc1337: Osc1337Parser::new(),
+                kitty: KittyParser::new(),
                 store: ImageStore::new(),
                 config,
             }),
@@ -57,12 +83,11 @@ impl TerminalState {
         };
 
         // Terminal reset clears the screen and all tracked images.
-        if data.contains('\u{1b}') && data.contains("\u{1b}c") {
-            images.store.clear();
-            images.parser.reset();
+        if data.contains("\u{1b}c") {
+            images.reset();
         }
 
-        for segment in images.parser.parse(data) {
+        for segment in images.parse(data) {
             match segment {
                 Segment::Text(text) => {
                     let scrolled = self.vt.feed_str(&text).scrollback.count();
@@ -70,6 +95,8 @@ impl TerminalState {
                         images.store.scroll(scrolled);
                     }
                 }
+
+                Segment::ClearImages => images.store.clear(),
 
                 Segment::Image(image) => {
                     let cursor = self.vt.cursor();

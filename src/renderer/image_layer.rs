@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use rgb::RGBA8;
 
-use crate::graphics::{Image, Mime, Placement};
+use crate::graphics::{Dim, Image, Mime, Placement};
 
 /// A decoded image in straight-alpha RGBA8, ready to sample.
 pub struct DecodedImage {
@@ -68,20 +68,32 @@ fn draw(buf: &mut [RGBA8], grid: &Grid, placement: &Placement, image: &DecodedIm
         return;
     }
 
-    let aspect = image.width as f64 / image.height as f64;
+    let iw = image.width as f64;
+    let ih = image.height as f64;
 
-    // Height spans display_rows cells; width follows aspect, clamped to the
-    // space remaining to the right edge (letterboxed, matching object-fit
-    // contain).
+    // The placement box: `display_rows` cells tall, and as wide as the image's
+    // declared width (kitty `c` columns / iTerm2 width), else the space
+    // remaining to the right edge. The image is scaled to fit inside the box
+    // preserving aspect ratio (letterboxed, matching object-fit contain).
     let box_h = placement.display_rows as f64 * grid.char_h;
+    let terminal_w = grid.cols as f64 * grid.char_w;
     let avail_w = (grid.cols - placement.col) as f64 * grid.char_w;
 
-    let mut draw_h = box_h;
-    let mut draw_w = draw_h * aspect;
-    if draw_w > avail_w {
-        draw_w = avail_w;
-        draw_h = draw_w / aspect;
+    let box_w = match placement.image.width {
+        Dim::Cells(c) => c * grid.char_w,
+        Dim::Px(p) => p,
+        Dim::Percent(pc) => pc / 100.0 * terminal_w,
+        Dim::Auto => avail_w,
     }
+    .min(avail_w);
+
+    if box_w < 1.0 || box_h < 1.0 {
+        return;
+    }
+
+    let scale = (box_w / iw).min(box_h / ih);
+    let draw_w = iw * scale;
+    let draw_h = ih * scale;
 
     if draw_w < 1.0 || draw_h < 1.0 {
         return;
@@ -163,8 +175,40 @@ fn decode(image: &Image) -> Option<DecodedImage> {
         Mime::Png | Mime::Jpeg | Mime::Gif | Mime::Webp | Mime::Bmp => decode_raster(&image.data),
         Mime::Svg => decode_svg(&image.data),
         Mime::Pdf => decode_pdf(&image.data),
+        Mime::Rgb => decode_raw(image, 3),
+        Mime::Rgba => decode_raw(image, 4),
         Mime::Unknown => None,
     }
+}
+
+/// Decode kitty raw pixel data (`f=24`/`f=32`) using the sender-declared
+/// dimensions carried in [`Image::natural`].
+fn decode_raw(image: &Image, channels: usize) -> Option<DecodedImage> {
+    let (w, h) = image.natural?;
+    let (w, h) = (w as usize, h as usize);
+    let needed = w.checked_mul(h)?.checked_mul(channels)?;
+
+    if image.data.len() < needed {
+        return None;
+    }
+
+    let pixels = (0..w * h)
+        .map(|i| {
+            let o = i * channels;
+            let d = &image.data;
+            if channels == 4 {
+                RGBA8::new(d[o], d[o + 1], d[o + 2], d[o + 3])
+            } else {
+                RGBA8::new(d[o], d[o + 1], d[o + 2], 255)
+            }
+        })
+        .collect();
+
+    Some(DecodedImage {
+        width: w,
+        height: h,
+        pixels,
+    })
 }
 
 fn decode_raster(data: &[u8]) -> Option<DecodedImage> {

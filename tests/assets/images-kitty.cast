@@ -1,0 +1,11 @@
+{"version": 2, "width": 40, "height": 24}
+[0.0, "o", "kitty graphics protocol demo\r\n\r\n"]
+[0.5, "o", "RGBA red:\r\n"]
+[1.0, "o", "\u001b_Ga=T,f=32,s=8,v=8,c=6,r=3;3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/9w8PP/cPDz/3Dw8/w==\u001b\\\r\n\r\n"]
+[1.5, "o", "RGBA green:\r\n"]
+[2.0, "o", "\u001b_Ga=T,f=32,s=8,v=8,c=6,r=3;PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/zzIWv88yFr/PMha/w==\u001b\\\r\n\r\n"]
+[2.5, "o", "RGBA blue:\r\n"]
+[3.0, "o", "\u001b_Ga=T,f=32,s=8,v=8,c=6,r=3;UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/1B45v9QeOb/UHjm/w==\u001b\\\r\n\r\n"]
+[3.5, "o", "PNG yellow:\r\n"]
+[4.0, "o", "\u001b_Ga=T,f=100,c=6,r=3;iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAE0lEQVR4nGN4dsLmPz7MMDIUAAAXyLpBq2QzaQAAAABJRU5ErkJggg==\u001b\\\r\n\r\n"]
+[4.5, "o", "done\r\n"]

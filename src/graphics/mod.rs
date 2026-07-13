@@ -11,6 +11,7 @@
 //! `Segment` interface.
 
 mod format;
+mod kitty;
 mod layout;
 mod osc1337;
 mod store;
@@ -18,6 +19,7 @@ mod store;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+pub use kitty::KittyParser;
 pub use layout::image_rows;
 pub use osc1337::Osc1337Parser;
 pub use store::ImageStore;
@@ -31,7 +33,8 @@ pub enum Dim {
     Auto,
 }
 
-/// Image container format, detected from the payload's magic bytes.
+/// Image container format, detected from the payload's magic bytes, or (for the
+/// kitty protocol's raw transmission formats) declared by the sender.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mime {
     Png,
@@ -41,6 +44,10 @@ pub enum Mime {
     Bmp,
     Svg,
     Pdf,
+    /// Raw 24-bit RGB pixels (kitty `f=24`); dimensions come from [`Image::natural`].
+    Rgb,
+    /// Raw 32-bit RGBA pixels (kitty `f=32`); dimensions come from [`Image::natural`].
+    Rgba,
     Unknown,
 }
 
@@ -90,9 +97,12 @@ impl PartialEq for Placement {
     }
 }
 
-/// One piece of parsed terminal output: either text to feed to the VT, or a
-/// completed image to place at the current cursor.
+/// One piece of parsed terminal output.
 pub enum Segment {
+    /// Text to feed to the VT.
     Text(String),
+    /// A completed image to place at the current cursor.
     Image(Image),
+    /// Drop all active image placements (kitty delete-all, `a=d`).
+    ClearImages,
 }

@@ -1,16 +1,18 @@
-//! End-to-end tests for inline image rendering (iTerm2 OSC 1337).
+//! End-to-end tests for inline image rendering.
 //!
-//! Renders asciinema-player's `images-iterm2.cast` through the public `run`
-//! API and confirms images are composited onto the GIF, on both backends, by
-//! diffing the output against a run with inline images disabled.
+//! Renders casts embedding images (iTerm2 OSC 1337 and the kitty graphics
+//! protocol) through the public `run` API and confirms images are composited
+//! onto the GIF, on both backends, by diffing the output against a run with
+//! inline images disabled.
 
 use std::io::Cursor;
 
 use image::{AnimationDecoder, RgbaImage};
 
-const CAST: &[u8] = include_bytes!("assets/images-iterm2.cast");
+const ITERM2_CAST: &[u8] = include_bytes!("assets/images-iterm2.cast");
+const KITTY_CAST: &[u8] = include_bytes!("assets/images-kitty.cast");
 
-fn render(renderer: agg::Renderer, inline_images: bool) -> Vec<u8> {
+fn render(cast: &[u8], renderer: agg::Renderer, inline_images: bool) -> Vec<u8> {
     let config = agg::Config {
         renderer,
         inline_images,
@@ -20,7 +22,7 @@ fn render(renderer: agg::Renderer, inline_images: bool) -> Vec<u8> {
     };
 
     let mut out = Vec::new();
-    agg::run(Cursor::new(CAST), &mut out, config).expect("run should succeed");
+    agg::run(Cursor::new(cast), &mut out, config).expect("run should succeed");
     out
 }
 
@@ -37,9 +39,9 @@ fn count_differing_pixels(a: &RgbaImage, b: &RgbaImage) -> usize {
     a.pixels().zip(b.pixels()).filter(|(x, y)| x != y).count()
 }
 
-fn assert_composites_images(renderer: agg::Renderer) {
-    let with = last_frame(&render(renderer.clone(), true));
-    let without = last_frame(&render(renderer, false));
+fn assert_composites_images(cast: &[u8], renderer: agg::Renderer) {
+    let with = last_frame(&render(cast, renderer.clone(), true));
+    let without = last_frame(&render(cast, renderer, false));
 
     // Compositing the inline images must change a substantial number of pixels
     // relative to the text-only render.
@@ -51,11 +53,21 @@ fn assert_composites_images(renderer: agg::Renderer) {
 }
 
 #[test]
-fn swash_composites_inline_images() {
-    assert_composites_images(agg::Renderer::Swash);
+fn swash_composites_iterm2_images() {
+    assert_composites_images(ITERM2_CAST, agg::Renderer::Swash);
 }
 
 #[test]
-fn resvg_composites_inline_images() {
-    assert_composites_images(agg::Renderer::Resvg);
+fn resvg_composites_iterm2_images() {
+    assert_composites_images(ITERM2_CAST, agg::Renderer::Resvg);
+}
+
+#[test]
+fn swash_composites_kitty_images() {
+    assert_composites_images(KITTY_CAST, agg::Renderer::Swash);
+}
+
+#[test]
+fn resvg_composites_kitty_images() {
+    assert_composites_images(KITTY_CAST, agg::Renderer::Resvg);
 }

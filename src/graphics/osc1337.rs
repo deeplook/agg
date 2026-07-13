@@ -274,7 +274,7 @@ mod tests {
         segs.iter()
             .filter_map(|s| match s {
                 Segment::Image(img) => Some(img),
-                Segment::Text(_) => None,
+                _ => None,
             })
             .collect()
     }
@@ -283,7 +283,7 @@ mod tests {
         segs.iter()
             .filter_map(|s| match s {
                 Segment::Text(t) => Some(t.as_str()),
-                Segment::Image(_) => None,
+                _ => None,
             })
             .collect()
     }
