@@ -1,6 +1,8 @@
 use avt::Vt;
 
-use crate::graphics::{image_rows, ImageStore, KittyParser, Osc1337Parser, Placement, Segment};
+use crate::graphics::{
+    image_rows, ImageStore, KittyParser, Osc1337Parser, Placement, Segment, SixelParser,
+};
 
 pub fn build(terminal_size: (usize, usize)) -> Vt {
     Vt::builder()
@@ -29,21 +31,30 @@ pub struct TerminalState {
 struct ImageState {
     osc1337: Osc1337Parser,
     kitty: KittyParser,
+    sixel: SixelParser,
     store: ImageStore,
     config: ImageConfig,
 }
 
 impl ImageState {
-    /// Parse output through both protocol parsers. The OSC parser runs first
-    /// and passes kitty's APC sequences through as text (it only intercepts
-    /// `ESC ]`), which the kitty parser then splits.
+    /// Parse output through each protocol parser in turn. Every parser only
+    /// intercepts its own escape (`ESC ]`, `ESC _ G`, `ESC P`) and passes the
+    /// rest through as text, so chaining them splits out all image kinds while
+    /// leaving ordinary output untouched.
     fn parse(&mut self, data: &str) -> Vec<Segment> {
         let mut segments = Vec::new();
 
-        for segment in self.osc1337.parse(data) {
-            match segment {
-                Segment::Text(text) => segments.extend(self.kitty.parse(&text)),
-                other => segments.push(other),
+        for osc_segment in self.osc1337.parse(data) {
+            let Segment::Text(text) = osc_segment else {
+                segments.push(osc_segment);
+                continue;
+            };
+
+            for kitty_segment in self.kitty.parse(&text) {
+                match kitty_segment {
+                    Segment::Text(text) => segments.extend(self.sixel.parse(&text)),
+                    other => segments.push(other),
+                }
             }
         }
 
@@ -54,6 +65,7 @@ impl ImageState {
         self.store.clear();
         self.osc1337.reset();
         self.kitty.reset();
+        self.sixel.reset();
     }
 }
 
@@ -65,6 +77,7 @@ impl TerminalState {
             images: image_config.map(|config| ImageState {
                 osc1337: Osc1337Parser::new(),
                 kitty: KittyParser::new(),
+                sixel: SixelParser::new(),
                 store: ImageStore::new(),
                 config,
             }),

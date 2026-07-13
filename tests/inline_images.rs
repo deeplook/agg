@@ -72,6 +72,34 @@ fn resvg_composites_kitty_images() {
     assert_composites_images(KITTY_CAST, agg::Renderer::Resvg);
 }
 
+/// A cast with a hand-written sixel image: two 24-wide bands, red over green.
+fn sixel_cast() -> Vec<u8> {
+    // #0=red, #1=green; `!24~` fills 24 columns of a full 6-row band; `-` is a
+    // band (newline); so this is a 24x12 red-over-green block.
+    let sixel = "\x1bPq#0;2;100;0;0#1;2;0;100;0#0!24~-#1!24~\x1b\\";
+
+    let mut cast = String::from("{\"version\":2,\"width\":40,\"height\":12}\n");
+    for event in [
+        serde_json::to_string(&(0.0f64, "o", "sixel:\r\n")).unwrap(),
+        serde_json::to_string(&(0.1f64, "o", format!("{sixel}\r\n"))).unwrap(),
+        serde_json::to_string(&(0.2f64, "o", "done\r\n")).unwrap(),
+    ] {
+        cast.push_str(&event);
+        cast.push('\n');
+    }
+    cast.into_bytes()
+}
+
+#[test]
+fn swash_composites_sixel_images() {
+    assert_composites_images(&sixel_cast(), agg::Renderer::Swash);
+}
+
+#[test]
+fn resvg_composites_sixel_images() {
+    assert_composites_images(&sixel_cast(), agg::Renderer::Resvg);
+}
+
 // --- Animated GIF playback -------------------------------------------------
 
 /// A 3-frame animated GIF (red, green, blue), 200ms per frame.

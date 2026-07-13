@@ -15,6 +15,7 @@ mod format;
 mod kitty;
 mod layout;
 mod osc1337;
+mod sixel;
 mod store;
 
 use std::rc::Rc;
@@ -23,6 +24,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub use kitty::KittyParser;
 pub use layout::image_rows;
 pub use osc1337::Osc1337Parser;
+pub use sixel::SixelParser;
 pub use store::ImageStore;
 
 /// An iTerm2 dimension spec (`width=`/`height=` parameter value).
