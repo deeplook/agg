@@ -122,6 +122,24 @@ mod tests {
     }
 
     #[test]
+    fn parses_apng_delays() {
+        use base64::Engine;
+
+        // A 2x2, 2-frame APNG (red, blue), 120ms per frame.
+        const APNG_B64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACGFjVEwAAAACAAAAAPONk3AAAAAaZmNUTAAAAAAAAAACAAAAAgAAAAAAAAAAAAMAGQAAjPSSSQAAABRJREFUeJxj/M/A8J+BgYGBiQEKAB8XAgJPlM6+AAAAGmZjVEwAAAABAAAAAgAAAAIAAAAAAAAAAAADABkAABeHeJ0AAAAYZmRBVAAAAAJ4nGNkYPj/n4GBgYGJAQoAHRkCAunm7jEAAAAASUVORK5CYII=";
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(APNG_B64)
+            .unwrap();
+
+        let info = parse(&data, Mime::Png).expect("apng should parse");
+        assert_eq!(info.delays.len(), 2);
+        // 120ms frames, well above the clamp threshold, so parsed as-is.
+        for d in &info.delays {
+            assert!((0.11..0.13).contains(d), "expected ~0.12s, got {d}");
+        }
+    }
+
+    #[test]
     fn static_png_is_not_animated() {
         let mut png = Cursor::new(Vec::new());
         image::DynamicImage::new_rgba8(2, 2)

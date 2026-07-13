@@ -419,6 +419,16 @@ mod tests {
     }
 
     #[test]
+    fn no_inline_images_flag_defaults_off_and_parses() {
+        let cli = Cli::try_parse_from(["agg", "input.cast", "output.gif"]).unwrap();
+        assert!(!cli.no_inline_images);
+
+        let cli =
+            Cli::try_parse_from(["agg", "--no-inline-images", "input.cast", "output.gif"]).unwrap();
+        assert!(cli.no_inline_images);
+    }
+
+    #[test]
     fn select_accepts_valid_selector() {
         use agg::SelectionSpec;
 
