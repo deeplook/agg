@@ -243,18 +243,23 @@ pub fn run<I: BufRead, O: Write + Send>(input: I, output: O, config: Config) -> 
 
     let frames: Vec<frames::Frame> = match plan {
         // Range selections produce time-based animation frames: dedupe duplicate
-        // states, normalize the first frame to t=0, then cap FPS.
+        // states, cap FPS, expand embedded animation into idle gaps, then
+        // normalize the first frame to t=0. The shift runs last so animation
+        // frame selection can use the original recording times.
         selection::SelectionPlan::Range { start, end } => {
             let frames = frames::from_range(&events, terminal_size, image_config, start, end);
             let frames = output::dedupe_visual_changes(frames);
-            let frames = output::adjust_timeline_timestamps(frames);
-            output::cap_fps(frames, config.fps_cap).collect()
+            let frames = output::cap_fps(frames, config.fps_cap);
+            let frames = output::expand_animation(frames.collect(), config.fps_cap);
+            output::adjust_timeline_timestamps(frames.into_iter()).collect()
         }
 
         // Discrete selections: keep every resolved position, with no visual
-        // dedupe or FPS capping, spaced by a fixed per-frame duration.
+        // dedupe or FPS capping, spaced by a fixed per-frame duration. Each
+        // position still shows the correct embedded animation frame for its time.
         selection::SelectionPlan::Positions(positions) => {
             let frames = frames::at_positions(&events, terminal_size, image_config, positions);
+            let frames = output::set_anim_frames(frames);
             output::adjust_discrete_timestamps(frames, config.last_frame_duration).collect()
         }
     };

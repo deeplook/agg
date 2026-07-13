@@ -19,13 +19,23 @@ impl ImageStore {
         Self::default()
     }
 
-    /// Add a new placement at the given grid position.
-    pub fn add(&mut self, image: Rc<Image>, col: usize, row: isize, display_rows: usize) {
+    /// Add a new placement at the given grid position. `start_time` is the
+    /// recording time the image was emitted, anchoring animation playback.
+    pub fn add(
+        &mut self,
+        image: Rc<Image>,
+        col: usize,
+        row: isize,
+        display_rows: usize,
+        start_time: f64,
+    ) {
         self.placements.push(Placement {
             image,
             col,
             row,
             display_rows,
+            start_time,
+            anim_frame: 0,
         });
     }
 
@@ -67,13 +77,14 @@ mod tests {
             width: Dim::Auto,
             height: Dim::Auto,
             preserve_aspect: true,
+            animation: None,
         })
     }
 
     #[test]
     fn scroll_decrements_rows() {
         let mut store = ImageStore::new();
-        store.add(image(), 0, 5, 3);
+        store.add(image(), 0, 5, 3, 0.0);
         store.scroll(2);
         assert_eq!(store.snapshot()[0].row, 3);
     }
@@ -81,7 +92,7 @@ mod tests {
     #[test]
     fn scroll_drops_placements_fully_above_viewport() {
         let mut store = ImageStore::new();
-        store.add(image(), 0, 1, 2); // spans rows 1..3
+        store.add(image(), 0, 1, 2, 0.0); // spans rows 1..3
         store.scroll(3); // row -> -2, bottom edge -2+2 = 0, not > 0
         assert!(store.snapshot().is_empty());
     }
@@ -89,7 +100,7 @@ mod tests {
     #[test]
     fn scroll_keeps_partially_visible_placements() {
         let mut store = ImageStore::new();
-        store.add(image(), 0, 1, 3); // spans rows 1..4
+        store.add(image(), 0, 1, 3, 0.0); // spans rows 1..4
         store.scroll(2); // row -> -1, bottom edge -1+3 = 2 > 0
         assert_eq!(store.snapshot()[0].row, -1);
     }
@@ -97,7 +108,7 @@ mod tests {
     #[test]
     fn clear_removes_everything() {
         let mut store = ImageStore::new();
-        store.add(image(), 0, 0, 1);
+        store.add(image(), 0, 0, 1, 0.0);
         store.clear();
         assert!(store.snapshot().is_empty());
     }

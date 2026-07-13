@@ -13,7 +13,7 @@ use std::mem;
 
 use base64::Engine;
 
-use super::{format, Dim, Image, Mime, Segment};
+use super::{animation, format, Dim, Image, Mime, Segment};
 
 /// Reusable OSC 1337 parser. Holds cross-call state: a buffer for an incomplete
 /// trailing sequence and any in-progress multipart transfer.
@@ -250,6 +250,7 @@ fn build_image(width: Dim, height: Dim, preserve_aspect: bool, base64_data: &str
     }
 
     let natural = format::natural_dimensions(&data, mime);
+    let animation = animation::parse(&data, mime);
 
     Some(Image {
         id: Image::next_id(),
@@ -259,6 +260,7 @@ fn build_image(width: Dim, height: Dim, preserve_aspect: bool, base64_data: &str
         width,
         height,
         preserve_aspect,
+        animation,
     })
 }
 

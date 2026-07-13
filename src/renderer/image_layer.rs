@@ -8,9 +8,11 @@
 //! the right edge), and placements scrolled above the top are clipped.
 
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use image::AnimationDecoder;
 use rgb::RGBA8;
 
 use crate::graphics::{Dim, Image, Mime, Placement};
@@ -22,11 +24,12 @@ pub struct DecodedImage {
     pixels: Vec<RGBA8>,
 }
 
-/// Per-renderer cache of decoded images, keyed by [`Image::id`]. A failed decode
-/// is cached as `None` so it is attempted only once.
+/// Per-renderer cache of decoded image frames, keyed by [`Image::id`]. Static
+/// images decode to a single frame; animated GIF/APNG to one per frame. A
+/// failed decode is cached as `None` so it is attempted only once.
 #[derive(Default)]
 pub struct DecodeCache {
-    cache: HashMap<u64, Option<DecodedImage>>,
+    cache: HashMap<u64, Option<Vec<DecodedImage>>>,
 }
 
 impl DecodeCache {
@@ -34,11 +37,11 @@ impl DecodeCache {
         Self::default()
     }
 
-    fn get(&mut self, image: &Image) -> Option<&DecodedImage> {
+    fn get(&mut self, image: &Image) -> Option<&[DecodedImage]> {
         self.cache
             .entry(image.id)
             .or_insert_with(|| decode(image))
-            .as_ref()
+            .as_deref()
     }
 }
 
@@ -57,8 +60,11 @@ pub struct Grid {
 /// Composite every placement onto `buf` (row-major RGBA8, `pixel_width` wide).
 pub fn composite(buf: &mut [RGBA8], grid: &Grid, placements: &[Placement], cache: &mut DecodeCache) {
     for placement in placements {
-        if let Some(image) = cache.get(&placement.image) {
-            draw(buf, grid, placement, image);
+        if let Some(frames) = cache.get(&placement.image) {
+            if let Some(frame) = frames.get(placement.anim_frame.min(frames.len().saturating_sub(1)))
+            {
+                draw(buf, grid, placement, frame);
+            }
         }
     }
 }
@@ -170,15 +176,60 @@ fn sample_bilinear(image: &DecodedImage, u: f64, v: f64) -> RGBA8 {
     )
 }
 
-fn decode(image: &Image) -> Option<DecodedImage> {
-    match image.mime {
+fn decode(image: &Image) -> Option<Vec<DecodedImage>> {
+    // Animated GIF/APNG decode to all their frames; everything else is one.
+    if image.animation.is_some() {
+        return decode_animated(&image.data, image.mime);
+    }
+
+    let single = match image.mime {
         Mime::Png | Mime::Jpeg | Mime::Gif | Mime::Webp | Mime::Bmp => decode_raster(&image.data),
         Mime::Svg => decode_svg(&image.data),
         Mime::Pdf => decode_pdf(&image.data),
         Mime::Rgb => decode_raw(image, 3),
         Mime::Rgba => decode_raw(image, 4),
         Mime::Unknown => None,
-    }
+    }?;
+
+    Some(vec![single])
+}
+
+/// Decode every frame of an animated GIF/APNG into full-canvas RGBA (the `image`
+/// crate coalesces frame disposal/blending for us).
+fn decode_animated(data: &[u8], mime: Mime) -> Option<Vec<DecodedImage>> {
+    let frames = match mime {
+        Mime::Gif => image::codecs::gif::GifDecoder::new(Cursor::new(data))
+            .ok()?
+            .into_frames()
+            .collect_frames()
+            .ok()?,
+        Mime::Png => image::codecs::png::PngDecoder::new(Cursor::new(data))
+            .ok()?
+            .apng()
+            .ok()?
+            .into_frames()
+            .collect_frames()
+            .ok()?,
+        _ => return None,
+    };
+
+    let decoded: Vec<DecodedImage> = frames
+        .into_iter()
+        .map(|frame| {
+            let buffer = frame.into_buffer();
+            let (w, h) = buffer.dimensions();
+            DecodedImage {
+                width: w as usize,
+                height: h as usize,
+                pixels: buffer
+                    .pixels()
+                    .map(|p| RGBA8::new(p[0], p[1], p[2], p[3]))
+                    .collect(),
+            }
+        })
+        .collect();
+
+    (!decoded.is_empty()).then_some(decoded)
 }
 
 /// Decode kitty raw pixel data (`f=24`/`f=32`) using the sender-declared
@@ -319,4 +370,51 @@ fn pdf_to_png(data: &[u8]) -> Option<Vec<u8>> {
 fn run_converter(program: &str, args: &[&str]) -> Option<()> {
     let status = Command::new(program).args(args).status().ok()?;
     status.success().then_some(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graphics::{AnimationInfo, Dim};
+
+    fn animated_gif(colors: &[[u8; 3]]) -> Vec<u8> {
+        use image::codecs::gif::{GifEncoder, Repeat};
+        use image::{Delay, Frame, RgbaImage};
+
+        let mut out = Vec::new();
+        {
+            let mut encoder = GifEncoder::new(Cursor::new(&mut out));
+            encoder.set_repeat(Repeat::Infinite).unwrap();
+            for c in colors {
+                let buf = RgbaImage::from_pixel(4, 4, image::Rgba([c[0], c[1], c[2], 255]));
+                let frame = Frame::from_parts(buf, 0, 0, Delay::from_numer_denom_ms(80, 1));
+                encoder.encode_frame(frame).unwrap();
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn decodes_every_frame_of_an_animated_gif() {
+        let data = animated_gif(&[[255, 0, 0], [0, 255, 0], [0, 0, 255]]);
+        let image = Image {
+            id: 1,
+            data,
+            mime: Mime::Gif,
+            natural: Some((4, 4)),
+            width: Dim::Auto,
+            height: Dim::Auto,
+            preserve_aspect: true,
+            animation: Some(AnimationInfo {
+                delays: vec![0.08, 0.08, 0.08],
+                total: 0.24,
+            }),
+        };
+
+        let frames = decode(&image).expect("animated gif should decode");
+        assert_eq!(frames.len(), 3);
+        // First frame is solid red.
+        assert_eq!(frames[0].pixels[0], RGBA8::new(255, 0, 0, 255));
+        assert_eq!(frames[2].pixels[0], RGBA8::new(0, 0, 255, 255));
+    }
 }

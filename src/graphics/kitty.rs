@@ -24,7 +24,7 @@ use std::mem;
 
 use base64::Engine;
 
-use super::{format, Dim, Image, Mime, Segment};
+use super::{animation, format, Dim, Image, Mime, Segment};
 
 type Control = HashMap<char, String>;
 
@@ -276,6 +276,8 @@ fn build(data: Vec<u8>, mime: Mime, natural: Option<(u32, u32)>, control: &Contr
             .unwrap_or(Dim::Auto)
     };
 
+    let animation = animation::parse(&data, mime);
+
     Image {
         id: Image::next_id(),
         data,
@@ -284,6 +286,7 @@ fn build(data: Vec<u8>, mime: Mime, natural: Option<(u32, u32)>, control: &Contr
         width: cells('c'),
         height: cells('r'),
         preserve_aspect: true,
+        animation,
     }
 }
 

@@ -76,7 +76,7 @@ impl TerminalState {
     /// anchored to the cursor position reached by the preceding text, and image
     /// placements are scrolled to track the terminal (see the player's
     /// `core.js` split-feed).
-    pub fn feed_str(&mut self, data: &str) {
+    pub fn feed_str(&mut self, data: &str, time: f64) {
         let Some(images) = &mut self.images else {
             self.vt.feed_str(data);
             return;
@@ -114,9 +114,13 @@ impl TerminalState {
                     }
 
                     let adjusted_row = row as isize - scrolled as isize;
-                    images
-                        .store
-                        .add(std::rc::Rc::new(image), col, adjusted_row, display_rows);
+                    images.store.add(
+                        std::rc::Rc::new(image),
+                        col,
+                        adjusted_row,
+                        display_rows,
+                        time,
+                    );
                 }
             }
         }
@@ -165,10 +169,13 @@ mod tests {
                 width: Dim::Auto,
                 height: Dim::Auto,
                 preserve_aspect: true,
+                animation: None,
             }),
             col: 0,
             row: 0,
             display_rows: 1,
+            start_time: 0.0,
+            anim_frame: 0,
         }
     }
 

@@ -96,7 +96,7 @@ fn generate_with<'a, E: FrameEmitter + 'a>(
 
             Some(event) => {
                 if let Event::Output { data, .. } = event {
-                    state.feed_str(data);
+                    state.feed_str(data, event.time());
                 }
 
                 let frame = Frame::from_state(event.time(), &state);

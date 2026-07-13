@@ -59,6 +59,7 @@ mod tests {
             width,
             height,
             preserve_aspect: true,
+            animation: None,
         }
     }
 

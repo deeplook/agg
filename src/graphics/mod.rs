@@ -10,6 +10,7 @@
 //! ([`osc1337`]); kitty is a planned addition wired in through the same
 //! `Segment` interface.
 
+mod animation;
 mod format;
 mod kitty;
 mod layout;
@@ -67,6 +68,38 @@ pub struct Image {
     pub width: Dim,
     pub height: Dim,
     pub preserve_aspect: bool,
+    /// Per-frame timing for animated GIF/APNG; `None` for static images.
+    pub animation: Option<AnimationInfo>,
+}
+
+/// Frame timing for an animated image, used to pick which frame to show at a
+/// given elapsed time.
+#[derive(Debug, Clone)]
+pub struct AnimationInfo {
+    /// Seconds each frame is shown, in order.
+    pub delays: Vec<f64>,
+    /// Sum of `delays` (one loop's duration).
+    pub total: f64,
+}
+
+impl AnimationInfo {
+    /// Frame index to display `elapsed` seconds after the animation started,
+    /// looping indefinitely.
+    pub fn frame_at(&self, elapsed: f64) -> usize {
+        if self.total <= 0.0 || self.delays.len() <= 1 {
+            return 0;
+        }
+
+        let mut e = elapsed.rem_euclid(self.total);
+        for (i, delay) in self.delays.iter().enumerate() {
+            e -= delay;
+            if e < 0.0 {
+                return i;
+            }
+        }
+
+        self.delays.len() - 1
+    }
 }
 
 static NEXT_IMAGE_ID: AtomicU64 = AtomicU64::new(1);
@@ -86,9 +119,18 @@ pub struct Placement {
     pub col: usize,
     pub row: isize,
     pub display_rows: usize,
+    /// Recording time (adjusted timeline) at which the image was placed; the
+    /// anchor for animation playback.
+    pub start_time: f64,
+    /// Which animation frame to display; resolved during frame post-processing
+    /// (see [`crate::output::expand_animation`]). Always 0 for static images.
+    pub anim_frame: usize,
 }
 
 impl PartialEq for Placement {
+    // Intentionally excludes `start_time`/`anim_frame`: visual dedupe of
+    // terminal content runs before animation frames are resolved, and must
+    // still collapse otherwise-identical placements.
     fn eq(&self, other: &Self) -> bool {
         self.image.id == other.image.id
             && self.col == other.col
