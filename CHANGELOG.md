@@ -57,9 +57,10 @@ agg tests/assets/image-pdf.cast          out.gif   # PDF (needs a rasterizer)
 
 ---
 
-## [1.9.0-images] — 2026-07-13
+## [1.9.0+images] — 2026-07-13
 
-Based on upstream agg 1.9.0.
+Based on upstream agg 1.9.0. `agg --version` reports `1.9.0+images` so this fork
+is distinguishable from an upstream install.
 
 ### Added
 
