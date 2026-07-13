@@ -51,6 +51,7 @@ no external tools.
 ```sh
 agg tests/assets/images-iterm2.cast      out.gif   # PNG/JPEG/WebP/BMP/GIF/SVG/PDF
 agg tests/assets/images-kitty.cast       out.gif   # kitty graphics protocol
+agg tests/assets/image-sixel.cast        out.gif   # sixel graphics
 agg tests/assets/image-animated-gif.cast out.gif   # animated GIF playback
 agg tests/assets/image-pdf.cast          out.gif   # PDF (needs a rasterizer)
 ```
@@ -80,7 +81,14 @@ is distinguishable from an upstream install.
   - PNG (`f=100`) and raw RGB/RGBA pixels (`f=24`/`f=32`), optionally
     zlib-compressed (`o=z`) and/or split across chunks (`m=1`).
   - Cell-sized placement via `c`/`r`, and delete-all (`a=d`).
-  - Both protocols can appear in the same recording.
+
+- **Sixel graphics.** Sixel DCS sequences (`ESC P … q … ESC \`) — the most
+  widely supported terminal image format (xterm, foot, wezterm, mintty, mlterm,
+  Windows Terminal, …), emitted by tools like `img2sixel`, `chafa`, and `lsix` —
+  are decoded (via the `sixel-image` crate) and composited like any other image.
+  Non-sixel DCS sequences pass through untouched.
+
+  All three protocols (OSC 1337, kitty, sixel) can appear in the same recording.
 
 - **Animated GIF and APNG playback.** Embedded animated images now play in the
   output GIF instead of showing only their first frame. agg synthesizes frames
@@ -114,6 +122,8 @@ is distinguishable from an upstream install.
   the recording); no synthetic trailing playback is added.
 - **PDF requires an external rasterizer** (see above); macOS works out of the box
   via `sips` (rendered at the PDF's native resolution).
+- **Sixel:** unset pixels are treated as transparent (the terminal background
+  shows through), and the HLS color space is converted to RGB.
 - **kitty:** file/shared-memory transmission media, the native animation protocol
   (`a=f`/`a=a`), unicode placeholders, selective deletes (only delete-all is
   honored), and the do-not-move-cursor flag are not implemented — a
