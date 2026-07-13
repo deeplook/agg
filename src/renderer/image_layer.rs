@@ -316,16 +316,16 @@ fn pixmap_to_decoded(pixmap: &tiny_skia::Pixmap) -> DecodedImage {
 
 static PDF_WARNED: AtomicBool = AtomicBool::new(false);
 
-/// Best-effort PDF rendering: shell out to `pdftoppm` (poppler) or `mutool`
-/// (mupdf) to rasterize the first page, then decode the resulting PNG. If no
-/// converter is available the image is skipped and a warning is logged once.
+/// Best-effort PDF rendering: shell out to an available PDF rasterizer to render
+/// the first page, then decode the resulting PNG. If none is available the image
+/// is skipped and a warning is logged once.
 fn decode_pdf(data: &[u8]) -> Option<DecodedImage> {
     match pdf_to_png(data) {
         Some(png) => decode_raster(&png),
         None => {
             if !PDF_WARNED.swap(true, Ordering::Relaxed) {
                 log::warn!(
-                    "skipping inline PDF image(s): install `pdftoppm` (poppler) or `mutool` (mupdf) to render them"
+                    "skipping inline PDF image(s): install `pdftoppm` (poppler), `gs` (ghostscript), or `mutool` (mupdf) to render them (macOS `sips` is used automatically)"
                 );
             }
             None
@@ -348,18 +348,43 @@ fn pdf_to_png(data: &[u8]) -> Option<Vec<u8>> {
     let in_str = in_path.to_string_lossy().into_owned();
     let out_str = out_path.to_string_lossy().into_owned();
 
-    // pdftoppm writes "<prefix>.png" with -singlefile; give it the prefix.
+    // pdftoppm writes "<prefix>.png" with -singlefile; give it the prefix
+    // (which equals out_path without the extension).
     let out_prefix = base.to_string_lossy().into_owned();
 
-    let png = run_converter("pdftoppm", &["-png", "-singlefile", "-r", "150", &in_str, &out_prefix])
-        .and_then(|()| std::fs::read(&out_path).ok())
-        .or_else(|| {
-            run_converter(
-                "mutool",
-                &["draw", "-r", "150", "-o", &out_str, &in_str, "1"],
-            )
-            .and_then(|()| std::fs::read(&out_path).ok())
-        });
+    // Ordered fallbacks, first available wins. pdftoppm / gs / mutool rasterize
+    // at 150 DPI; macOS's built-in `sips` renders at the PDF's native size, so
+    // it goes last as a zero-install, lower-resolution safety net.
+    let attempts: [(&str, Vec<&str>); 4] = [
+        (
+            "pdftoppm",
+            vec!["-png", "-singlefile", "-r", "150", &in_str, &out_prefix],
+        ),
+        (
+            "gs",
+            vec![
+                "-q",
+                "-dNOPAUSE",
+                "-dBATCH",
+                "-sDEVICE=png16m",
+                "-dFirstPage=1",
+                "-dLastPage=1",
+                "-r150",
+                "-o",
+                &out_str,
+                &in_str,
+            ],
+        ),
+        ("mutool", vec!["draw", "-r", "150", "-o", &out_str, &in_str, "1"]),
+        ("sips", vec!["-s", "format", "png", &in_str, "--out", &out_str]),
+    ];
+
+    let png = attempts.iter().find_map(|(program, args)| {
+        // Avoid reading a stale output from an earlier failed attempt.
+        let _ = std::fs::remove_file(&out_path);
+        run_converter(program, args)?;
+        std::fs::read(&out_path).ok()
+    });
 
     let _ = std::fs::remove_file(&in_path);
     let _ = std::fs::remove_file(&out_path);
