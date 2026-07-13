@@ -3,6 +3,7 @@ use std::{fmt::Write, sync::Arc};
 use imgref::ImgVec;
 use rgb::{FromSlice, RGBA8};
 
+use super::image_layer::{self, DecodeCache, Grid};
 use super::{color_to_rgb, text_attrs, Renderer, Settings, TextAttrs};
 use crate::terminal::Snapshot;
 use crate::theme::Theme;
@@ -17,6 +18,7 @@ pub struct ResvgRenderer<'a> {
     options: usvg::Options<'a>,
     transform: tiny_skia::Transform,
     header: String,
+    image_cache: DecodeCache,
     bold_is_bright: bool,
 }
 
@@ -233,6 +235,7 @@ impl<'a> ResvgRenderer<'a> {
             options,
             transform,
             header,
+            image_cache: DecodeCache::new(),
             bold_is_bright: settings.bold_is_bright,
         }
     }
@@ -401,7 +404,25 @@ impl<'a> Renderer for ResvgRenderer<'a> {
             tiny_skia::Pixmap::new(self.pixel_width as u32, self.pixel_height as u32).unwrap();
 
         resvg::render(&tree, self.transform, &mut pixmap.as_mut());
-        let buf = pixmap.take().as_rgba().to_vec();
+        let mut buf = pixmap.take().as_rgba().to_vec();
+
+        if !snapshot.images.is_empty() {
+            let (cols, rows) = self.terminal_size;
+            let char_w = self.pixel_width as f64 / (cols + 2) as f64;
+            let char_h = self.pixel_height as f64 / (rows + 1) as f64;
+
+            let grid = Grid {
+                char_w,
+                char_h,
+                margin_l: char_w,
+                margin_t: char_h / 2.0,
+                cols,
+                pixel_width: self.pixel_width,
+                pixel_height: self.pixel_height,
+            };
+
+            image_layer::composite(&mut buf, &grid, &snapshot.images, &mut self.image_cache);
+        }
 
         ImgVec::new(buf, self.pixel_width, self.pixel_height)
     }

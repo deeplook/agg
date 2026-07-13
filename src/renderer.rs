@@ -1,3 +1,4 @@
+mod image_layer;
 mod resvg;
 mod swash;
 
@@ -10,6 +11,23 @@ use crate::theme::Theme;
 pub trait Renderer {
     fn render(&mut self, snapshot: &Snapshot) -> ImgVec<RGBA8>;
     fn pixel_size(&self) -> (usize, usize);
+}
+
+/// Pixel size of one terminal cell for the given font: `(char_width,
+/// char_height)`. Reuses the swash renderer's advance-width metric so inline
+/// image placement matches the rendered grid. Falls back to a nominal width if
+/// the family somehow fails to resolve (it is guaranteed to by `fonts::init`).
+pub fn cell_metrics(
+    font_db: &fontdb::Database,
+    text_family: &str,
+    font_size: usize,
+    line_height: f64,
+) -> (f64, f64) {
+    let char_w =
+        swash::col_width(font_db, text_family, font_size).unwrap_or(font_size as f64 * 0.6);
+    let char_h = font_size as f64 * line_height;
+
+    (char_w, char_h)
 }
 
 pub struct Settings {
@@ -842,7 +860,11 @@ mod tests {
         lines: Vec<avt::Line>,
         cursor: Option<(usize, usize)>,
     ) -> ImgVec<RGBA8> {
-        renderer.render(&Snapshot { lines, cursor })
+        renderer.render(&Snapshot {
+            lines,
+            cursor,
+            images: Vec::new(),
+        })
     }
 
     fn settings(bold_is_bright: bool) -> Settings {
