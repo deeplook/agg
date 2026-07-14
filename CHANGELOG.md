@@ -23,6 +23,10 @@ on [Keep a Changelog](https://keepachangelog.com/).
 
 This fork builds the same `agg` binary, so it can replace an existing install.
 
+**Prebuilt binary:** download a release archive for your platform from the
+[GitHub Releases page](https://github.com/deeplook/agg/releases) and put the
+`agg` binary on your `PATH`. No Rust toolchain required.
+
 **With Cargo (recommended):**
 
 ```sh
