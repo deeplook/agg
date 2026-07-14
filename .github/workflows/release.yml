@@ -9,6 +9,8 @@ jobs:
   create-release:
     name: Create GH release draft
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -22,6 +24,8 @@ jobs:
     needs: create-release
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
 
     strategy:
       matrix:
